@@ -1,0 +1,56 @@
+# A headless Service - no cluster IP. It exists to give each pod a stable
+# DNS name: engine-0.engine, engine-1.engine, engine-2.engine
+apiVersion: v1
+kind: Service
+metadata:
+  name: engine
+spec:
+  clusterIP: None
+  selector:
+    app: engine
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: engine
+spec:
+  serviceName: engine          # must match the headless Service above
+  replicas: 3
+  selector:
+    matchLabels: { app: engine }
+  template:
+    metadata:
+      labels: { app: engine }
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: engine
+          image: localhost/exchange-gateway:v1
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3000 }]
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet: { path: /readyz, port: 3000 }
+            initialDelaySeconds: 2
+            periodSeconds: 2
+
+  # One PVC per pod, created automatically, named data-engine-0, data-engine-1 ...
+  # These are deliberately NOT deleted when you scale down or delete the StatefulSet.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 128Mi

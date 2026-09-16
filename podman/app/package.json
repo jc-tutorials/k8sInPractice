@@ -1,0 +1,9 @@
+{
+  "name": "exchange-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A small service that makes configuration, state and resource pressure visible.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "express": "^4.19.2" }
+}

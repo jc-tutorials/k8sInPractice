@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exchange Gateway</title>
+<style>
+  :root{--ground:#0B0F14;--surface:#131A22;--surface2:#1B242E;--rule:#28333F;
+        --ink:#E8EDF2;--muted:#93A1AE;--dim:#68757F;--accent:#F5A524;--up:#2ED47A;--down:#F0475B;
+        --mono:ui-monospace,"JetBrains Mono",Menlo,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px;background:var(--ground);color:var(--ink);
+       font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+  .wrap{max-width:1000px;margin:0 auto;display:grid;gap:16px}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  h1{font-size:19px;margin:0;letter-spacing:-.01em}
+  .tag{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+
+  .who{border-radius:4px;padding:20px 22px;color:#fff;display:flex;align-items:center;gap:18px;
+       transition:background .25s;background:#334155}
+  .who .em{font-size:46px;line-height:1}
+  .who .nm{font-family:var(--mono);font-size:17px;font-weight:700;word-break:break-all}
+  .who .sub{font-family:var(--mono);font-size:11px;opacity:.9;margin-top:3px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:16px 18px}
+  .k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .val{background:var(--surface2);border:1px solid var(--rule);border-radius:3px;padding:11px 13px}
+  .val .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .val .v{font-family:var(--mono);font-size:21px;font-weight:700;margin-top:5px}
+  .val.stale{border-color:var(--down)} .val.stale .v{color:var(--down)}
+  .val.live{border-color:var(--up)}   .val.live .v{color:var(--up)}
+  .mismatch{margin-top:11px;font-size:12.5px;color:var(--down);line-height:1.5;display:none}
+  .mismatch.show{display:block}
+
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  td{padding:5px 0;border-bottom:1px solid var(--rule);color:var(--muted)}
+  td:last-child{text-align:right;color:var(--ink)}
+  tr:last-child td{border-bottom:0}
+
+  .stat{display:flex;align-items:baseline;gap:10px}
+  .stat .n{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--accent)}
+  .stat .u{font-size:12px;color:var(--dim)}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;
+        padding:3px 9px;border-radius:2px;text-transform:uppercase;letter-spacing:.06em}
+  .chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .chip.ok{color:var(--up);border:1px solid var(--up)}
+  .chip.no{color:var(--down);border:1px solid var(--down)}
+
+  .btns{display:flex;gap:9px;flex-wrap:wrap}
+  button{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+         background:var(--surface2);border:1px solid var(--rule);color:var(--ink);
+         padding:9px 13px;border-radius:3px;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button.danger:hover{border-color:var(--down);color:var(--down)}
+  .log{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:18px}
+  .seen{display:flex;flex-wrap:wrap;gap:4px}
+  .dot{width:13px;height:13px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Exchange Gateway</h1><span class="tag" id="meta">connecting…</span></header>
+
+  <div class="who" id="who">
+    <div class="em" id="em">⏳</div>
+    <div>
+      <div class="nm" id="pod">waiting…</div>
+      <div class="sub" id="sub"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="k">Tick size — same key, two routes in</div>
+      <div class="pair">
+        <div class="val stale"><div class="lbl">from env var</div><div class="v" id="tickEnv">–</div></div>
+        <div class="val live"><div class="lbl">from mounted file</div><div class="v" id="tickFile">–</div></div>
+      </div>
+      <div class="mismatch" id="mismatch">
+        These disagree. The file updated; the environment variable is frozen at the value this
+        pod started with. <strong>Restart the pod and they will agree again.</strong>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="k">Instruments — from a mounted file</div>
+      <table id="instruments"><tr><td>no file mounted</td><td></td></tr></table>
+    </div>
+
+    <div class="card">
+      <div class="k">Secret</div>
+      <div id="secret"><span class="chip no">not mounted</span></div>
+      <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:11px" id="secretDetail"></div>
+    </div>
+
+    <div class="card">
+      <div class="k">Persisted state</div>
+      <div class="stat"><span class="n" id="orders">0</span><span class="u">orders recorded on this pod</span></div>
+      <div style="font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:10px" id="storage"></div>
+    </div>
+
+    <div class="card">
+      <div class="k">Memory held on purpose</div>
+      <div class="stat"><span class="n" id="mem">0</span><span class="u">MB</span></div>
+      <div style="font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:10px">
+        Push this past the container's memory limit to meet OOMKilled.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="k">Pods that have answered you</div>
+      <div class="seen" id="seen"></div>
+      <div style="font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:10px" id="seenCount"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="k">Controls</div>
+    <div class="btns">
+      <button id="order">place an order</button>
+      <button id="burn">burn cpu · 5s</button>
+      <button id="alloc">hold +32 MB</button>
+      <button id="release">release memory</button>
+      <button id="break" class="danger">break this pod</button>
+    </div>
+    <div class="log" id="log" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const seen = new Map();
+  let lastPod = null;
+
+  async function refresh() {
+    try {
+      const d = await (await fetch('/api/state', { cache: 'no-store' })).json();
+      $('who').style.background = d.colour;
+      $('em').textContent = d.emoji;
+      $('pod').textContent = d.pod;
+      $('sub').textContent = `node ${d.node} · ${d.version} · up ${d.uptimeSeconds}s`;
+      $('meta').textContent = 'polling /api/state';
+
+      $('tickEnv').textContent = d.config.tickSizeFromEnv;
+      $('tickFile').textContent = d.config.tickSizeFromFile;
+      const differ = d.config.tickSizeFromFile !== '(no file mounted)' &&
+                     d.config.tickSizeFromEnv !== '(not set)' &&
+                     d.config.tickSizeFromEnv !== d.config.tickSizeFromFile;
+      $('mismatch').classList.toggle('show', differ);
+
+      $('instruments').innerHTML = d.config.instruments.length
+        ? d.config.instruments.map(i => `<tr><td>${i.symbol}</td><td>${i.tick}</td></tr>`).join('')
+        : '<tr><td>no file mounted</td><td></td></tr>';
+
+      $('secret').innerHTML = d.secret.present
+        ? '<span class="chip ok">mounted</span>' : '<span class="chip no">not mounted</span>';
+      $('secretDetail').textContent = d.secret.present
+        ? `${d.secret.masked}  ·  via ${d.secret.source}` : 'no API_KEY found';
+
+      $('orders').textContent = d.state.orders;
+      $('storage').textContent = `${d.state.dataDir} · ${d.state.writable ? 'writable' : 'READ ONLY'}`;
+      $('mem').textContent = d.memoryHeldMb;
+
+      if (d.pod !== lastPod) { lastPod = d.pod; }
+      const e = seen.get(d.pod) || { colour: d.colour, n: 0 };
+      e.n++; e.colour = d.colour; seen.set(d.pod, e);
+      $('seen').innerHTML = [...seen.entries()]
+        .map(([n, v]) => `<div class="dot" style="background:${v.colour}" title="${n}"></div>`).join('');
+      $('seenCount').textContent = `${seen.size} distinct pod${seen.size === 1 ? '' : 's'}`;
+    } catch {
+      $('pod').textContent = 'nobody answered';
+      $('em').textContent = '💀';
+      $('who').style.background = '#1e293b';
+    }
+  }
+
+  const log = m => $('log').textContent = m;
+  $('order').onclick = async () => {
+    const r = await (await fetch('/api/order', { method: 'POST' })).json();
+    log(`${r.pod} → ${r.orders} orders ${r.persisted ? '(written to disk)' : '(NOT persisted)'}`);
+  };
+  $('burn').onclick = async () => {
+    log('burning cpu across 25 requests…');
+    for (let i = 0; i < 25; i++) await fetch('/api/burn?ms=200');
+    log('done — watch the HPA');
+  };
+  $('alloc').onclick = async () => {
+    const r = await (await fetch('/api/alloc?mb=32')).json();
+    log(`${r.pod} now holding ${r.heldMb} MB`);
+  };
+  $('release').onclick = async () => { await fetch('/api/release'); log('released'); };
+  $('break').onclick = async () => {
+    const r = await (await fetch('/api/break', { method: 'POST' })).json();
+    log(`broke ${r.pod} — it will now fail its health check`);
+  };
+
+  refresh();
+  setInterval(refresh, 1000);
+</script>
+</body>
+</html>

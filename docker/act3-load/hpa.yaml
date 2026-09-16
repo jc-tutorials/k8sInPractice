@@ -1,0 +1,24 @@
+# Replicas become an output, not something you set.
+# This only works because the Deployment sets a CPU *request* - the target
+# below is a percentage OF that request. No request, no percentage, no scaling.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60   # shortened so the lab is watchable

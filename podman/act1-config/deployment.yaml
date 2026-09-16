@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: localhost/exchange-gateway:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+
+          # ROUTE 1 - every key in the ConfigMap becomes an environment
+          # variable. Read once, at process start, and frozen from then on.
+          envFrom:
+            - configMapRef:
+                name: gateway-config
+
+          # ROUTE 2 - the same ConfigMap, mounted as files. The app re-reads
+          # these on every request, so they can change while the pod runs.
+          volumeMounts:
+            - name: config
+              mountPath: /etc/gateway
+            - name: secrets
+              mountPath: /etc/gateway-secrets
+              readOnly: true
+
+          readinessProbe:
+            httpGet: { path: /readyz, port: 3000 }
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            failureThreshold: 1
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3000 }
+            initialDelaySeconds: 3
+            periodSeconds: 3
+            failureThreshold: 3
+
+          resources:
+            requests: { cpu: "100m", memory: "96Mi" }
+            limits:   { memory: "192Mi" }
+
+      volumes:
+        - name: config
+          configMap:
+            name: gateway-config
+        - name: secrets
+          secret:
+            secretName: market-data-feed

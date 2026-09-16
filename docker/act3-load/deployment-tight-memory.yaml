@@ -1,0 +1,35 @@
+# Same gateway, with a memory limit low enough to walk into on purpose.
+# Apply this, then hold memory from the UI until the container is OOMKilled.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: gateway }
+  template:
+    metadata:
+      labels: { app: gateway }
+    spec:
+      containers:
+        - name: gateway
+          image: exchange-gateway:v1
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3000 }]
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+          envFrom:
+            - configMapRef: { name: gateway-config }
+          volumeMounts:
+            - name: config
+              mountPath: /etc/gateway
+          resources:
+            requests: { cpu: "100m", memory: "96Mi" }
+            limits:   { memory: "128Mi" }    # <- deliberately tight
+      volumes:
+        - name: config
+          configMap: { name: gateway-config }

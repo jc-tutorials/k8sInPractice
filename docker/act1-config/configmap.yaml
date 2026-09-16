@@ -1,0 +1,15 @@
+# Configuration as data, living in the cluster rather than inside the image.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+data:
+  # short values - these become environment variables AND files
+  TICK_SIZE: "0.01"
+  MAX_ORDER_SIZE: "10000"
+  # a whole file - this one can only sensibly arrive as a file
+  instruments.csv: |
+    VOD.L,0.01
+    BP.L,0.05
+    HSBA.L,0.02
+    SHEL.L,0.05

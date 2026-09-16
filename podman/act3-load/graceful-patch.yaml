@@ -1,0 +1,21 @@
+# maxUnavailable: 0 protects your CAPACITY. It does not, on its own, protect
+# the requests already in flight to a pod that is going away.
+#
+# When a pod starts terminating, two things happen AT THE SAME TIME:
+#   1. it is removed from the Service endpoints (which takes a moment to reach
+#      every ingress controller and kube-proxy), and
+#   2. the container gets SIGTERM.
+#
+# If 2 finishes before 1 has propagated, traffic is still being sent to a
+# process that has already closed its listener. A short preStop sleep holds
+# the container open while the removal spreads.
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: gateway
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]

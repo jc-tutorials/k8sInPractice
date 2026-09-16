@@ -1,0 +1,29 @@
+# Step 1: storage that does NOT outlive the pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: engine }
+  template:
+    metadata:
+      labels: { app: engine }
+    spec:
+      containers:
+        - name: engine
+          image: exchange-gateway:v1
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3000 }]
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}          # <- dies with the pod
