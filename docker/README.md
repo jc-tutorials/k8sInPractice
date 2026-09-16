@@ -13,7 +13,7 @@ guess teaches us more than a command that just quietly works.
 ## Lab 0 — Get a cluster (5 min, do it during the intro)
 
 ```bash
-cd lab/docker
+cd docker
 k3d cluster create --config k3d-config.yaml
 kubectl config use-context k3d-exchange
 kubectl get nodes

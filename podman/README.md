@@ -60,7 +60,7 @@ for your Mac; to undo it, delete that one file.
 ### 0b. Create the cluster
 
 ```bash
-cd lab/podman
+cd podman
 k3d cluster create --config k3d-config.yaml
 kubectl config use-context k3d-exchange
 kubectl get nodes
